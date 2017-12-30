@@ -31,7 +31,9 @@ void clamp(matrix& m, int min, int max){
     }
 }
 
-matrix readppm(std::string fname){
+//------------------------------------------[Input/Output]------------------------------------------
+
+matrix readpgm(std::string fname){
     std::ifstream infile;
     infile.open(fname);
     if (!infile){
@@ -40,11 +42,9 @@ matrix readppm(std::string fname){
     }
     std::string line;
     std::getline(infile, line);
-    std::cerr << line << std::endl;
     std::getline(infile, line);
     std::stringstream linestream(line);
     linestream >> WIDTH >> HEIGHT;
-    std::cerr << "WIDTH: " << WIDTH << "\tHEIGHT: " << HEIGHT << std::endl;
     std::getline(infile, line);
     matrix out; 
     std::string lines = "";
@@ -65,7 +65,7 @@ matrix readppm(std::string fname){
     return out;
 }
 
-void printppm(matrix in){
+void printpgm(matrix in){
     clamp(in, 0, 255);
     std::cout << "P2\n" << WIDTH << ' ' << HEIGHT << "\n255\n";
     for(std::vector<int> i : in){
@@ -75,6 +75,35 @@ void printppm(matrix in){
         std::cout << std::endl;
     }
 }
+
+void to_ascii(const matrix& img){
+    std::cout << '\n';
+    std::string pix = " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
+    int colordepth = pix.length();
+    std::cout << "colordepth: " << colordepth << '\n';
+    int scale = 75;
+    int w = WIDTH/scale;
+    int h = HEIGHT/scale;
+    int avg, count;
+    for(int i = 0; i < HEIGHT - (HEIGHT%scale); i += h){
+        for(int j = 0; j < WIDTH - (WIDTH%scale); j+= w){
+            avg = 0;
+            count = 0;
+            for(int y = i; y < i + h; y++){
+                for(int x = j; x < j + w; x++){
+                    avg += img[y][x];
+                    count++;
+                }
+            }
+            avg /= count;
+            char c = pix[avg*colordepth/255];
+            std::cout << c << c;
+        }
+        std::cout << '\n';
+    }
+}
+
+//------------------------------------------[Convolution]-------------------------------------------
 
 matrix convolution(const matrix& img, const matrix& kernel, double coef = 1.0){
     std::cerr << "Coef = " << coef << std::endl;
@@ -148,6 +177,68 @@ matrix angle(const matrix& mx, const matrix& my){
     return out;
 }
 
+//--------------------------------------[Threshold Functions]---------------------------------------
+
+//double threshold
+matrix threshold(const matrix& img, int weak, int strong){
+    matrix out;
+    out.resize(HEIGHT);
+    for(int i = 0; i < HEIGHT; i++){
+        out[i].resize(WIDTH);
+    }
+    for(int i = 0; i < HEIGHT; i++){
+        for(int j = 0; j < WIDTH; j++){
+            //Strong pixels have a value of 255,
+            //candidates are 128, and weak pixels are 0.
+            if(img[i][j] >= strong) out[i][j] = 255;
+            else if(img[i][j] >= weak) out[i][j] = 128;
+            else out[i][j] = 0;
+        }
+    }
+    return out;
+}
+
+//simple threshold
+void threshold(matrix& img, int val){
+    for(int i = 0; i < HEIGHT; i++){
+        for(int j = 0; j < WIDTH; j++){
+            if(img[i][j] >= val) img[i][j] = 255;
+            else img[i][j] = 0;
+        }
+    }
+}
+
+//calculate some usable values for the double threashold pass
+void threshold_values(const matrix& img, int& weak, int& strong){
+    int average = 0;
+    for(int i = 0; i < HEIGHT; i++){
+        for(int j = 0; j < WIDTH; j++){
+            average+= img[i][j];
+        }
+    }
+    average /= WIDTH * HEIGHT;
+    int weak_avg = 0;
+    int weak_count = 0;
+    int strong_avg = 0;
+    int strong_count = 0;
+    for(int i = 0; i < HEIGHT; i++){
+        for(int j = 0; j < WIDTH; j++){
+            if(img[i][j] < average){
+                weak_avg += img[i][j];
+                weak_count++;
+            }
+            else{
+                strong_avg += img[i][j];
+                strong_count++;
+            }
+        }
+    }
+    weak = (average + weak_avg/weak_count)/2;
+    strong = strong_avg/strong_count;
+}
+
+//-----------------------------------------[Edge Thinning]------------------------------------------
+
 //Non-maximum suppression
 matrix nmsuppression(const matrix& mang, const matrix& mmag){
     matrix out;
@@ -188,65 +279,7 @@ matrix nmsuppression(const matrix& mang, const matrix& mmag){
     return out;
 } 
 
-void to_ascii(const matrix& img){
-    std::cout << '\n';
-    std::string pix = " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
-    int colordepth = pix.length();
-    std::cout << "colordepth: " << colordepth << '\n';
-    int scale = 75;
-    int w = WIDTH/scale;
-    int h = HEIGHT/scale;
-    int avg, count;
-    for(int i = 0; i < HEIGHT - (HEIGHT%scale); i += h){
-        for(int j = 0; j < WIDTH - (WIDTH%scale); j+= w){
-            avg = 0;
-            count = 0;
-            for(int y = i; y < i + h; y++){
-                for(int x = j; x < j + w; x++){
-                    avg += img[y][x];
-                    count++;
-                }
-            }
-            avg /= count;
-            char c = pix[avg*colordepth/255];
-            std::cout << c << c;
-        }
-        std::cout << '\n';
-    }
-}
-
-struct coord{
-    int row;
-    int col;
-    coord(int a, int b): row(a), col(b) {}
-};
-
-matrix threshold(const matrix& img, int weak, int strong){
-    matrix out;
-    out.resize(HEIGHT);
-    for(int i = 0; i < HEIGHT; i++){
-        out[i].resize(WIDTH);
-    }
-    for(int i = 0; i < HEIGHT; i++){
-        for(int j = 0; j < WIDTH; j++){
-            //Strong pixels have a value of 255,
-            //candidates are 128, and weak pixels are 0.
-            if(img[i][j] >= strong) out[i][j] = 255;
-            else if(img[i][j] >= weak) out[i][j] = 128;
-            else out[i][j] = 0;
-        }
-    }
-    return out;
-}
-
-void threshold(matrix& img, int val){
-    for(int i = 0; i < HEIGHT; i++){
-        for(int j = 0; j < WIDTH; j++){
-            if(img[i][j] >= val) img[i][j] = 255;
-            else img[i][j] = 0;
-        }
-    }
-}
+//-------------------------------------------[Hysteresis]-------------------------------------------
 
 void chain(matrix& img, int r, int c, std::vector<std::vector<bool> >& visited){
     if(visited[r][c]) return; //already been here, don't bother
@@ -263,37 +296,7 @@ void chain(matrix& img, int r, int c, std::vector<std::vector<bool> >& visited){
     return;
 }
 
-void threshold_values(const matrix& img, int& weak, int& strong){
-    int average = 0;
-    for(int i = 0; i < HEIGHT; i++){
-        for(int j = 0; j < WIDTH; j++){
-            average+= img[i][j];
-        }
-    }
-    average /= WIDTH * HEIGHT;
-    int weak_avg = 0;
-    int weak_count = 0;
-    int strong_avg = 0;
-    int strong_count = 0;
-    for(int i = 0; i < HEIGHT; i++){
-        for(int j = 0; j < WIDTH; j++){
-            if(img[i][j] < average){
-                weak_avg += img[i][j];
-                weak_count++;
-            }
-            else{
-                strong_avg += img[i][j];
-                strong_count++;
-            }
-        }
-    }
-    weak = (average + weak_avg/weak_count)/2;
-    strong = strong_avg/strong_count;
-}
-
 void hysteresis(matrix& img){
-    std::vector<std::vector<coord> > out;
-    std::vector<coord> temp;
     std::vector<std::vector<bool> > visited;
     for(int i = 0; i < HEIGHT; i++){
         visited.push_back(std::vector<bool>(WIDTH, false));
@@ -309,8 +312,7 @@ void hysteresis(matrix& img){
     threshold(img, 255);
 }
 
-int main(int argc, char* argv[]){
-    matrix img = readppm(argv[1]);
+matrix canny(const matrix& img){
     matrix k = {{-1, -1, -1},
                 {-1,  8, -1},
                 {-1, -1, -1}};
@@ -329,6 +331,11 @@ int main(int argc, char* argv[]){
     threshold_values(mag, weak, strong);
     matrix out = threshold(nmsuppression(ang, mag), weak, strong);
     hysteresis(out);
-    printppm(out);
+    return out;
+}
+
+int main(int argc, char* argv[]){
+    matrix img = readpgm(argv[1]);
+    printpgm(canny(img));
     return 0;
 }
