@@ -127,10 +127,10 @@ matrix magnitude(const matrix& mx, const matrix& my){
 }
 
 int roundangle(int theta){
-    if(theta >=0 && theta < 23) return 0;
-    if(theta >= 23 && theta < 68) return 45;
-    if(theta >= 68 && theta < 113) return 90;
-    if(theta >= 113 && theta < 156) return 135;
+    if(theta < 23) return 0;
+    if(theta < 68) return 45;
+    if(theta < 113) return 90;
+    if(theta < 156) return 135;
     return 0;
 }
 
@@ -148,7 +148,7 @@ matrix angle(const matrix& mx, const matrix& my){
     return out;
 }
 
-
+//Non-maximum suppression
 matrix nmsuppression(const matrix& mang, const matrix& mmag){
     matrix out;
     out.resize(HEIGHT);
@@ -159,22 +159,22 @@ matrix nmsuppression(const matrix& mang, const matrix& mmag){
     for(int i = 0; i < HEIGHT; i++){
         for(int j = 0; j < WIDTH; j++){
             //North/South edge
-            if(mang[i][j] == 90){
+            if(mang[i][j] == 0){
                 testa = j > 0 ? mmag[i][j - 1] : 0;
                 testb = j < WIDTH - 1 ? mmag[i][j + 1] : 0;
             }
             //NW/SE edge
-            else if(mang[i][j] == 135){
+            else if(mang[i][j] == 45){
                 testa = i > 0 && j > 0 ? mmag[i-1][j-1] : 0;
                 testb = i < HEIGHT - 1 && j < WIDTH - 1 ? mmag[i+1][j+1] : 0;
             }
             //East/West edge
-            else if(mang[i][j] == 0){
+            else if(mang[i][j] == 90){
                 testa = i > 0 ? mmag[i-1][j] : 0;
                 testb = i < HEIGHT - 1 ? mmag[i+1][j] : 0;
             }
             //NE/SW edge
-            else if(mang[i][j] == 45){
+            else if(mang[i][j] == 135){
                 testa = i > 0 && j < WIDTH - 1 ? mmag[i-1][j+1] : 0;
                 testb = i < HEIGHT - 1 && j > 0 ? mmag[i+1][j-1] : 0;
             }
@@ -187,6 +187,127 @@ matrix nmsuppression(const matrix& mang, const matrix& mmag){
     }
     return out;
 } 
+
+void to_ascii(const matrix& img){
+    std::cout << '\n';
+    std::string pix = " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
+    int colordepth = pix.length();
+    std::cout << "colordepth: " << colordepth << '\n';
+    int scale = 75;
+    int w = WIDTH/scale;
+    int h = HEIGHT/scale;
+    int avg, count;
+    for(int i = 0; i < HEIGHT - (HEIGHT%scale); i += h){
+        for(int j = 0; j < WIDTH - (WIDTH%scale); j+= w){
+            avg = 0;
+            count = 0;
+            for(int y = i; y < i + h; y++){
+                for(int x = j; x < j + w; x++){
+                    avg += img[y][x];
+                    count++;
+                }
+            }
+            avg /= count;
+            char c = pix[avg*colordepth/255];
+            std::cout << c << c;
+        }
+        std::cout << '\n';
+    }
+}
+
+struct coord{
+    int row;
+    int col;
+    coord(int a, int b): row(a), col(b) {}
+};
+
+matrix threshold(const matrix& img, int weak, int strong){
+    matrix out;
+    out.resize(HEIGHT);
+    for(int i = 0; i < HEIGHT; i++){
+        out[i].resize(WIDTH);
+    }
+    for(int i = 0; i < HEIGHT; i++){
+        for(int j = 0; j < WIDTH; j++){
+            //Strong pixels have a value of 255,
+            //candidates are 128, and weak pixels are 0.
+            if(img[i][j] >= strong) out[i][j] = 255;
+            else if(img[i][j] >= weak) out[i][j] = 128;
+            else out[i][j] = 0;
+        }
+    }
+    return out;
+}
+
+void threshold(matrix& img, int val){
+    for(int i = 0; i < HEIGHT; i++){
+        for(int j = 0; j < WIDTH; j++){
+            if(img[i][j] >= val) img[i][j] = 255;
+            else img[i][j] = 0;
+        }
+    }
+}
+
+void chain(matrix& img, int r, int c, std::vector<std::vector<bool> >& visited){
+    if(visited[r][c]) return; //already been here, don't bother
+    visited[r][c] = true;
+    img[r][c] == 255; //we can only get here from a strong pixel, so we can make this one strong.
+    for(int i = r - 1; i <= r + 1; i++){
+        for(int j = c - 1; j <=c + 1; j++){
+            //if the pixel is out of bounds, ignore it.
+            if(i < 0 || j < 0 || i >= HEIGHT || j >= WIDTH) continue;
+            //if the next pixel is strong, or is a candidate, add it to the chain.
+            if(!visited[i][j] && img[i][j] > 127) chain(img, i, j, visited);
+        }
+    }
+    return;
+}
+
+void threshold_values(const matrix& img, int& weak, int& strong){
+    int average = 0;
+    for(int i = 0; i < HEIGHT; i++){
+        for(int j = 0; j < WIDTH; j++){
+            average+= img[i][j];
+        }
+    }
+    average /= WIDTH * HEIGHT;
+    int weak_avg = 0;
+    int weak_count = 0;
+    int strong_avg = 0;
+    int strong_count = 0;
+    for(int i = 0; i < HEIGHT; i++){
+        for(int j = 0; j < WIDTH; j++){
+            if(img[i][j] < average){
+                weak_avg += img[i][j];
+                weak_count++;
+            }
+            else{
+                strong_avg += img[i][j];
+                strong_count++;
+            }
+        }
+    }
+    weak = (average + weak_avg/weak_count)/2;
+    strong = strong_avg/strong_count;
+}
+
+void hysteresis(matrix& img){
+    std::vector<std::vector<coord> > out;
+    std::vector<coord> temp;
+    std::vector<std::vector<bool> > visited;
+    for(int i = 0; i < HEIGHT; i++){
+        visited.push_back(std::vector<bool>(WIDTH, false));
+    }
+    
+    for(int i = 0; i < HEIGHT; i++){
+        for(int j = 0; j < WIDTH; j++){
+            //start a chain IFF the pixel is strong.
+            if(img[i][j] == 255) chain(img, i, j, visited);
+        }
+    }
+    //remove any unconnected weak edges
+    threshold(img, 255);
+}
 
 int main(int argc, char* argv[]){
     matrix img = readppm(argv[1]);
@@ -204,6 +325,10 @@ int main(int argc, char* argv[]){
     matrix yedge = convolution(smooth, y);
     matrix mag = magnitude(xedge, yedge);
     matrix ang = angle(xedge, yedge);
-    printppm(nmsuppression(ang, mag));
+    int weak, strong;
+    threshold_values(mag, weak, strong);
+    matrix out = threshold(nmsuppression(ang, mag), weak, strong);
+    hysteresis(out);
+    printppm(out);
     return 0;
 }
