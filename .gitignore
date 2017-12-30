@@ -1,4 +1,6 @@
+glitch
 *.ppm
+*.pgm
 *.o
 *.jpg
 *.png
