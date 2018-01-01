@@ -12,6 +12,7 @@
 #define PI 3.14159265358
 
 int WIDTH, HEIGHT;
+std::string FORMAT;
 
 //--------------------------------------[Typedefs and Structs]--------------------------------------
 
@@ -29,9 +30,15 @@ struct pixel{
         r(red), g(grn), b(blu)
         {
             gray = false;
+            //RGB to Luma realtion per ITU BT.601
+            //https://stackoverflow.com/a/596241
             y = (0.299 * r) + (0.587 * g) + (0.114 * b);
         }
-    pixel(double luma): y(luma), gray(true) {}
+    pixel(double luma): y(luma), gray(true) {
+        r = y;
+        g = y;
+        b = y;
+    }
     pixel():r(0), g(0), b(0), y(0), gray(true) {}
 };
 
@@ -57,6 +64,14 @@ void clamp(matrix& m, int min, int max){
     }
 }
 
+image newimage(){
+    image out;
+    out.resize(HEIGHT);
+    for(int i = 0; i < HEIGHT; i++){
+        out[i].resize(WIDTH);
+    }
+    return out;
+}
 //------------------------------------------[Input/Output]------------------------------------------
 
 void getline_skip_comments(std::ifstream& fs, std::string& l, char c){
@@ -71,18 +86,18 @@ image readpgm(std::string fname){
     }
     std::string line;
     char c = '#';
-    //do{
+    do{
         std::getline(infile, line);
-    //} while(line[0] != c);
-    std::string magicnumber = line;
-    //do{
+    } while(line[0] == c);  //loop until <line> is not a comment.
+    FORMAT = line;
+    do{
         std::getline(infile, line);
-    //} while(line[0] != c);
+    } while(line[0] == c);
     std::stringstream linestream(line);
     linestream >> WIDTH >> HEIGHT;
-    //do{
+    do{
         std::getline(infile, line);
-    //} while(line[0] != c);
+    } while(line[0] == c);
     double max = std::stod(line);
     image out; 
     std::string lines = "";
@@ -92,10 +107,9 @@ image readpgm(std::string fname){
     linestream = std::stringstream(lines);
     std::vector<pixel> temp;
     double r, g, b, y;
-    std::cerr << "are we here?";
     //Grayscale image
-    if(magicnumber == "P2"){
-        while(linestream >> y){
+    if(FORMAT == "P2"){
+        while(linestream >> y && out.size() < HEIGHT){
             temp.push_back(pixel(y/max));
             if(temp.size() == WIDTH){
                 out.push_back(temp);
@@ -104,8 +118,8 @@ image readpgm(std::string fname){
         }
     }
     //Color Image
-    else if(magicnumber == "P3"){
-        while(linestream >> r, g, b){
+    else if(FORMAT == "P3"){
+        while(linestream >> r, g, b && out.size() < HEIGHT){
             temp.push_back(pixel(r/max, g/max, b/max));
             if(temp.size() == WIDTH){
                 out.push_back(temp);
@@ -123,12 +137,23 @@ image readpgm(std::string fname){
 }
 
 void printpgm(const image& in){
-    std::cout << "P3\n" << WIDTH << ' ' << HEIGHT << "\n255\n";
-    for(std::vector<pixel> i : in){
-        for(pixel pix : i){
-            std::cout << pix.r * 255 << ' ' << pix.g * 255 << ' ' << pix.b * 255 << ' ';
+    if(FORMAT == "P2"){
+        std::cout << "P2\n" << WIDTH << ' ' << HEIGHT << "\n255\n";
+        for(std::vector<pixel> i : in){
+            for(pixel pix : i){
+                std::cout << int(pix.y * 255) << ' ';
+            }
+            std::cout << std::endl;
         }
-        std::cout << std::endl;
+    }
+    if(FORMAT == "P3"){
+        std::cout << "P3\n" << WIDTH << ' ' << HEIGHT << "\n255\n";
+        for(std::vector<pixel> i : in){
+            for(pixel pix : i){
+                std::cout << int(pix.r * 255) << ' ' << int(pix.g * 255) << ' ' << int(pix.b * 255) << ' ';
+            }
+            std::cout << std::endl;
+        }
     }
 }
 
@@ -162,8 +187,7 @@ void to_ascii(const image& img){
 //------------------------------------------[Convolution]-------------------------------------------
 
 image convolution(const image& img, const matrix& kernel, double coef = 1.0){
-    image out;
-    std::vector<pixel> temp;
+    image out = newimage();
     double acc = 0;
     int k_off = (kernel.size() - 1) / 2;
     for(int row = 0; row < HEIGHT; row++){
@@ -179,10 +203,10 @@ image convolution(const image& img, const matrix& kernel, double coef = 1.0){
                 }
             }
             acc *= coef;
-            temp.push_back(pixel(acc));
+            acc = MAX(0.0, acc);
+            acc = MIN(acc, 1.0);
+            out[row][col] = pixel(acc);
         }
-        out.push_back(temp);
-        temp.clear();
     }
     return out;
 }
@@ -197,11 +221,7 @@ image gaussian(const image& img){
 }
 
 image magnitude(const image& mx, const image& my){
-    image out;
-    out.resize(HEIGHT);
-    for(int i = 0; i < HEIGHT; i++){
-        out[i].resize(WIDTH);
-    }
+    image out = newimage();
     for(int i = 0; i < HEIGHT; i++){
         for(int j = 0; j < WIDTH; j++){
             out[i][j] = pixel(sqrt((mx[i][j].y * mx[i][j].y) + (my[i][j].y * my[i][j].y)));
@@ -235,16 +255,12 @@ matrix angle(const image& mx, const image& my){
 //--------------------------------------[Threshold Functions]---------------------------------------
 
 //double threshold
-image threshold(const image& img, int weak, int strong, std::vector<coord>& stronglist){
-    image out;
-    out.resize(HEIGHT);
-    for(int i = 0; i < HEIGHT; i++){
-        out[i].resize(WIDTH);
-    }
+image threshold(const image& img, double weak, double strong, std::vector<coord>& stronglist){
+    image out = newimage();
     for(int i = 0; i < HEIGHT; i++){
         for(int j = 0; j < WIDTH; j++){
-            //Strong pixels have a value of 255,
-            //candidates are 128, and weak pixels are 0.
+            //Strong pixels have a value of 1,
+            //candidates are 1/2, and weak pixels are 0.
             if(img[i][j].y >= strong){
                 out[i][j] = pixel(1.0);
                 stronglist.push_back(coord(i, j));
@@ -257,7 +273,7 @@ image threshold(const image& img, int weak, int strong, std::vector<coord>& stro
 }
 
 //simple threshold
-void threshold(image& img, int val){
+void threshold(image& img, double val){
     for(int i = 0; i < HEIGHT; i++){
         for(int j = 0; j < WIDTH; j++){
             if(img[i][j].y >= val) img[i][j] = pixel(1.0);
@@ -267,7 +283,7 @@ void threshold(image& img, int val){
 }
 
 //calculate some usable values for the double threashold pass
-void threshold_values(const image& img, int& weak, int& strong){
+void threshold_values(const image& img, double& weak, double& strong){
     double average = 0;
     for(int i = 0; i < HEIGHT; i++){
         for(int j = 0; j < WIDTH; j++){
@@ -298,39 +314,35 @@ void threshold_values(const image& img, int& weak, int& strong){
 //-----------------------------------------[Edge Thinning]------------------------------------------
 
 //Non-maximum suppression
-image nmsuppression(const matrix& mang, const image& mmag){
-    image out;
-    out.resize(HEIGHT);
-    for(int i = 0; i < HEIGHT; i++){
-        out[i].resize(WIDTH);
-    }
+image nmsuppression(const matrix& ang, const image& mag){
+    image out = newimage();
     double testa, testb;
     for(int i = 0; i < HEIGHT; i++){
         for(int j = 0; j < WIDTH; j++){
             //North/South edge
-            if(mang[i][j] == 0){
-                testa = j > 0 ? mmag[i][j - 1].y : 0;
-                testb = j < WIDTH - 1 ? mmag[i][j + 1].y : 0;
+            if(ang[i][j] == 0){
+                testa = j > 0 ? mag[i][j - 1].y : 0;
+                testb = j < WIDTH - 1 ? mag[i][j + 1].y : 0;
             }
             //NW/SE edge
-            else if(mang[i][j] == 45){
-                testa = i > 0 && j > 0 ? mmag[i-1][j-1].y : 0;
-                testb = i < HEIGHT - 1 && j < WIDTH - 1 ? mmag[i+1][j+1].y : 0;
+            else if(ang[i][j] == 45){
+                testa = i > 0 && j > 0 ? mag[i-1][j-1].y : 0;
+                testb = i < HEIGHT - 1 && j < WIDTH - 1 ? mag[i+1][j+1].y : 0;
             }
             //East/West edge
-            else if(mang[i][j] == 90){
-                testa = i > 0 ? mmag[i-1][j].y : 0;
-                testb = i < HEIGHT - 1 ? mmag[i+1][j].y : 0;
+            else if(ang[i][j] == 90){
+                testa = i > 0 ? mag[i-1][j].y : 0;
+                testb = i < HEIGHT - 1 ? mag[i+1][j].y : 0;
             }
             //NE/SW edge
-            else if(mang[i][j] == 135){
-                testa = i > 0 && j < WIDTH - 1 ? mmag[i-1][j+1].y : 0;
-                testb = i < HEIGHT - 1 && j > 0 ? mmag[i+1][j-1].y : 0;
+            else if(ang[i][j] == 135){
+                testa = i > 0 && j < WIDTH - 1 ? mag[i-1][j+1].y : 0;
+                testb = i < HEIGHT - 1 && j > 0 ? mag[i+1][j-1].y : 0;
             }
-            else std::cerr << mang[i][j] << "\n";
+            else std::cerr << ang[i][j] << "\n";
 
 
-            if(mmag[i][j].y > testa && mmag[i][j].y > testb) out[i][j] = mmag[i][j];
+            if(mag[i][j].y > testa && mag[i][j].y > testb) out[i][j] = mag[i][j];
             else out[i][j] = pixel(0);
         }
     }
@@ -340,10 +352,8 @@ image nmsuppression(const matrix& mang, const image& mmag){
 //-------------------------------------------[Hysteresis]-------------------------------------------
 
 int stdepth = 0;
-void chain(image& img, int r, int c, std::vector<std::vector<bool> >& visited){
+void chain(image& img, int r, int c, bool** visited){
     if(visited[r][c]) return; //already been here, don't bother
-    stdepth++;
-    std::cerr << stdepth << '\n';
     visited[r][c] = true;
     img[r][c] = pixel(1.0); //we can only get here from a strong pixel, so we can make this one strong.
     //look at the 3x3 grid around [r][c]
@@ -352,51 +362,51 @@ void chain(image& img, int r, int c, std::vector<std::vector<bool> >& visited){
             //if the pixel is out of bounds, ignore it.
             if(i < 0 || j < 0 || i >= HEIGHT || j >= WIDTH) continue;
             //if the next pixel is strong, or is a candidate, add it to the chain.
-            if(!visited[i][j] && img[i][j].y > 0.5) {chain(img, i, j, visited); stdepth--;}
+            if(!visited[i][j] && img[i][j].y >= 0.5) chain(img, i, j, visited);
         }
     }
     return;
 }
 
 void hysteresis(image& img, std::vector<coord> slist){
-    std::vector<std::vector<bool> > visited;
+    bool** visited = new bool*[HEIGHT];
     for(int i = 0; i < HEIGHT; i++){
-        visited.push_back(std::vector<bool>(WIDTH, false));
+        visited[i] = new bool[WIDTH];
+        for(int j = 0; j < WIDTH; j++){
+            visited[i][j] = false;
+        }
     }
     
     for(int i = 0; i < slist.size(); i++){
         //start a chain IFF the pixel is strong.
         if(img[slist[i].row][slist[i].col].y == 1.0) chain(img, slist[i].row, slist[i].col, visited);
     }
-    std::cerr << "Error here.\n";
+    for(int i = 0; i < HEIGHT; i++){
+        delete[] visited[i];
+    }
+    delete[] visited;
     //remove any unconnected weak edges
     threshold(img, 1.0);
 }
 
 //Canny Edge Detector
 image canny(const image& img){
-    matrix x = {{-1, 0, 1},
-                {-2, 0, 2},
-                {-1, 0, 1}};
+    matrix x = {{-1.0, 0.0, 1.0},
+                {-2.0, 0.0, 2.0},
+                {-1.0, 0.0, 1.0}};
     matrix y = {{-1,-2,-1},
                 {0, 0, 0},
                 {1, 2, 1}};
-    std::cerr << "smoothing...";
     image smooth = gaussian(img);
-    std::cerr << "x-derivative...";
     image xedge = convolution(smooth, x);
-    std::cerr << "y-derivative...";
     image yedge = convolution(smooth, y);
-    std::cerr << "magnitude...";
     image mag = magnitude(xedge, yedge);
-    std::cerr << "angle...";
     matrix ang = angle(xedge, yedge);
-    int weak, strong;
+    double weak, strong;
     std::vector<coord> stronglist;
-    std::cerr << "thresholding...";
     threshold_values(mag, weak, strong);
-    image out = threshold(nmsuppression(ang, mag), weak, strong, stronglist);
-    std::cerr << "Hysteresis...";
+    image suppressed = nmsuppression(ang, mag);
+    image out = threshold(suppressed, weak, strong, stronglist);
     hysteresis(out, stronglist);
     return out;
 }
@@ -428,6 +438,9 @@ void pixelsort(image& img){
 
 int main(int argc, char* argv[]){
     image img = readpgm(argv[1]);
+    matrix avg = {  {1,1,1},
+                    {1,1,1},
+                    {1,1,1}};
     pixelsort(img);
     printpgm(img);
     return 0;
