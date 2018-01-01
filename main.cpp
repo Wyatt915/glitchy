@@ -119,7 +119,7 @@ image readpgm(std::string fname){
     }
     //Color Image
     else if(FORMAT == "P3"){
-        while(linestream >> r, g, b && out.size() < HEIGHT){
+        while(linestream >> r >> g >> b && out.size() < HEIGHT){
             temp.push_back(pixel(r/max, g/max, b/max));
             if(temp.size() == WIDTH){
                 out.push_back(temp);
