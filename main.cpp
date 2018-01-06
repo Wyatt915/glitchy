@@ -11,8 +11,7 @@
 
 //-----------------------------------------[Pixel Sorting]------------------------------------------
 
-void pixelsort(image& img){
-    image edge = canny(img);
+void pixelsort(image& img, const image& edge){
     int offset = 0;
     int count = 0;
     int prevpx = 0; //Default to the previous pixel not being an edge
@@ -40,10 +39,8 @@ void pixelsort(image& img){
 
 int main(int argc, char* argv[]){
     image img = readppm(argv[1]);
-    matrix avg = {  {1,1,1},
-                    {1,1,1},
-                    {1,1,1}};
-    pixelsort(img);
-    printppm(img);
+    //image blur = readppm(argv[2]);
+    //pixelsort(img, canny(blur));
+    printppm(canny(img));
     return 0;
 }

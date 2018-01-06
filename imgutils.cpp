@@ -21,6 +21,7 @@ image newimage(){
     return out;
 }
 
+//Convolution may produce pixels outside the range [0,1]
 image convolution(const image& img, const matrix& kernel, double coef){
     image out = newimage();
     double acc = 0;
@@ -38,12 +39,29 @@ image convolution(const image& img, const matrix& kernel, double coef){
                 }
             }
             acc *= coef;
-            acc = MAX(0.0, acc);
-            acc = MIN(acc, 1.0);
             out[row][col] = pixel(acc);
         }
     }
     return out;
+}
+
+//clips pixels < 0 to 0 and pixels > 1 to 1.
+void clip(image& img){
+    for(int i = 0; i < HEIGHT; i++){
+        for(int j = 0; j < WIDTH; j++){
+            img[i][j].y = MAX(0.0, img[i][j].y);
+            img[i][j].y = MIN(img[i][j].y, 1.0);
+        }
+    }
+}
+
+//linear map of pixel values from range [a, b] to [0, 1]
+void remap(image& img, double a, double b){
+    for(int i = 0; i < HEIGHT; i++){
+        for(int j = 0; j < WIDTH; j++){
+            img[i][j].y = (img[i][j].y - a) * (1.0 / (b - a));
+        }
+    }
 }
 
 image gaussian(const image& img){

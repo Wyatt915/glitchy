@@ -11,8 +11,9 @@ image canny(const image& img){
                 {1, 2, 1}};
     image smooth = gaussian(img);
     image xedge = convolution(smooth, x);
-    image yedge = convolution(smooth, y);
-    image mag = magnitude(xedge, yedge);
+    image yedge = convolution(smooth, y); //range: [-4, 4]
+    image mag = magnitude(xedge, yedge);  //range: [0, sqrt(32)]
+    remap(mag, 0, sqrt(32));
     matrix ang = angle(xedge, yedge);
     double weak, strong;
     std::vector<coord> stronglist;
@@ -69,8 +70,9 @@ void threshold_values(const image& img, double& weak, double& strong){
             }
         }
     }
-    weak = (average + weak_avg/weak_count)/2;
+    //weak = weak_avg/weak_count;
     strong = strong_avg/strong_count;
+    weak = (average + strong) / 2;
 }
 
 //-----------------------------------------[Edge Thinning]------------------------------------------
@@ -81,25 +83,25 @@ image nmsuppression(const matrix& ang, const image& mag){
     double testa, testb;
     for(int i = 0; i < HEIGHT; i++){
         for(int j = 0; j < WIDTH; j++){
-            //North/South edge
-            if(ang[i][j] == 0){
-                testa = j > 0 ? mag[i][j - 1].y : 0;
-                testb = j < WIDTH - 1 ? mag[i][j + 1].y : 0;
-            }
-            //NW/SE edge
-            else if(ang[i][j] == 45){
-                testa = i > 0 && j > 0 ? mag[i-1][j-1].y : 0;
-                testb = i < HEIGHT - 1 && j < WIDTH - 1 ? mag[i+1][j+1].y : 0;
-            }
             //East/West edge
-            else if(ang[i][j] == 90){
+            if(ang[i][j] == 0){
                 testa = i > 0 ? mag[i-1][j].y : 0;
                 testb = i < HEIGHT - 1 ? mag[i+1][j].y : 0;
             }
             //NE/SW edge
-            else if(ang[i][j] == 135){
+            else if(ang[i][j] == 45){
                 testa = i > 0 && j < WIDTH - 1 ? mag[i-1][j+1].y : 0;
                 testb = i < HEIGHT - 1 && j > 0 ? mag[i+1][j-1].y : 0;
+            }
+            //North/South edge
+            else if(ang[i][j] == 90){
+                testa = j > 0 ? mag[i][j - 1].y : 0;
+                testb = j < WIDTH - 1 ? mag[i][j + 1].y : 0;
+            }
+            //NW/SE edge
+            else if(ang[i][j] == 135){
+                testa = i > 0 && j > 0 ? mag[i-1][j-1].y : 0;
+                testb = i < HEIGHT - 1 && j < WIDTH - 1 ? mag[i+1][j+1].y : 0;
             }
 
             if(mag[i][j].y > testa && mag[i][j].y > testb) out[i][j] = mag[i][j];

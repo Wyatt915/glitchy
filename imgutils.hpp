@@ -58,3 +58,5 @@ image magnitude(const image& x, const image& y);
 image newimage();
 matrix angle(const image& x, const image& y);
 void threshold(image&, double value);
+void clip(image&);
+void remap(image&, double, double);
