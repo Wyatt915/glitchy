@@ -3,38 +3,77 @@
 #include <iostream>
 #include <sstream>
 
-int WIDTH, HEIGHT;
-std::string FORMAT;
+//------------------------------------------[Image Class]-------------------------------------------
 
+image::image(){
+    rows = 0;
+    cols = 0;
+}
+
+image::image(int r, int c):rows(r), cols(c){
+    data.resize(rows);
+    for(int i = 0; i < rows; i++){
+        data[i].resize(c);
+    }
+}
+
+image::image(std::vector<std::vector<pixel> > v){
+    data = v;
+    rows = v.size();
+    cols = v[0].size();
+}
+
+image::image(const image& other){
+    rows = other.rows;
+    cols = other.cols;
+    data = other.data;
+}
+
+void image::set_format(std::string f){
+    format = f;
+}
+
+std::string image::get_format() const {
+    return format;
+}
+
+int image::r() const {
+    return rows;
+}
+
+int image::c() const {
+    return cols;
+}
+
+const std::vector<pixel>& image::operator[](size_t i) const {
+    return data[i];
+}
+
+std::vector<pixel>& image::operator[](size_t i){
+    return data[i];
+}
+
+//--------------------------------------[Image manipulations]---------------------------------------
 
 void clamp(int& val, int min, int max){
     val = MAX(val, min);
     val = MIN(val, max);
 }
 
-image newimage(){
-    image out;
-    out.resize(HEIGHT);
-    for(int i = 0; i < HEIGHT; i++){
-        out[i].resize(WIDTH);
-    }
-    return out;
-}
-
 //Convolution may produce pixels outside the range [0,1]
 image convolution(const image& img, const matrix& kernel, double coef){
-    image out = newimage();
+    image out(img.r(), img.c());
     double acc = 0;
     int k_off = (kernel.size() - 1) / 2;
-    for(int row = 0; row < HEIGHT; row++){
-        for(int col = 0; col < WIDTH; col++){
+    for(int row = 0; row < img.r(); row++){
+        for(int col = 0; col < img.c(); col++){
             acc = 0;
             for(int i = 0; i < kernel.size(); i++){
                 for(int j = 0; j < kernel[0].size(); j++){
                     int r = row + i - k_off;
                     int c = col + j - k_off;
-                    clamp(c, 0, WIDTH - 1); //Extend the edge pixels to infinity
-                    clamp(r, 0, HEIGHT - 1);
+                    clamp(c, 0, img.c() - 1); //Extend the edge pixels to infinity
+                    clamp(r, 0, img.r() - 1);
                     acc += kernel[i][j] * img[r][c].y;
                 }
             }
@@ -47,8 +86,8 @@ image convolution(const image& img, const matrix& kernel, double coef){
 
 //clips pixels < 0 to 0 and pixels > 1 to 1.
 void clip(image& img){
-    for(int i = 0; i < HEIGHT; i++){
-        for(int j = 0; j < WIDTH; j++){
+    for(int i = 0; i < img.r(); i++){
+        for(int j = 0; j < img.c(); j++){
             img[i][j].y = MAX(0.0, img[i][j].y);
             img[i][j].y = MIN(img[i][j].y, 1.0);
         }
@@ -57,8 +96,8 @@ void clip(image& img){
 
 //linear map of pixel values from range [a, b] to [0, 1]
 void remap(image& img, double a, double b){
-    for(int i = 0; i < HEIGHT; i++){
-        for(int j = 0; j < WIDTH; j++){
+    for(int i = 0; i < img.r(); i++){
+        for(int j = 0; j < img.c(); j++){
             img[i][j].y = (img[i][j].y - a) * (1.0 / (b - a));
         }
     }
@@ -70,13 +109,20 @@ image gaussian(const image& img){
                      {5, 12, 15, 12, 5},
                      {4, 9,  12, 9,  4},
                      {2, 4,  5,  4,  2}};
-    return convolution(img, kernel, 1.0/159.0);
+    matrix kx = {{0.0545, 0.2442, 0.4026, 0.2442, 0.0545}};
+    matrix ky = {{0.0545},
+                 {0.2442},
+                 {0.4026},
+                 {0.2442},
+                 {0.0545}};
+    return convolution(convolution(img, kx), ky);
+    //return convolution(img, kernel, 1.0/159.0);
 }
 
 image magnitude(const image& mx, const image& my){
-    image out = newimage();
-    for(int i = 0; i < HEIGHT; i++){
-        for(int j = 0; j < WIDTH; j++){
+    image out(mx.r(), mx.c());
+    for(int i = 0; i < mx.r(); i++){
+        for(int j = 0; j < mx.c(); j++){
             out[i][j] = pixel(sqrt((mx[i][j].y * mx[i][j].y) + (my[i][j].y * my[i][j].y)));
         }
     }
@@ -94,12 +140,12 @@ int roundangle(int theta){
 
 matrix angle(const image& mx, const image& my){
     matrix out;
-    out.resize(HEIGHT);
-    for(int i = 0; i < HEIGHT; i++){
-        out[i].resize(WIDTH);
+    out.resize(mx.r());
+    for(int i = 0; i < mx.r(); i++){
+        out[i].resize(mx.c());
     }
-    for(int i = 0; i < HEIGHT; i++){
-        for(int j = 0; j < WIDTH; j++){
+    for(int i = 0; i < mx.r(); i++){
+        for(int j = 0; j < mx.c(); j++){
             out[i][j] = roundangle(360 * (atan2(my[i][j].y, mx[i][j].y) / (2*PI)));
         }
     }
@@ -108,8 +154,8 @@ matrix angle(const image& mx, const image& my){
 
 //simple threshold
 void threshold(image& img, double val){
-    for(int i = 0; i < HEIGHT; i++){
-        for(int j = 0; j < WIDTH; j++){
+    for(int i = 0; i < img.r(); i++){
+        for(int j = 0; j < img.c(); j++){
             if(img[i][j].y >= val) img[i][j] = pixel(1.0);
             else img[i][j] = pixel(0);
         }
@@ -118,6 +164,12 @@ void threshold(image& img, double val){
 
 //----------------------------------------------[I/O]-----------------------------------------------
 
+void getline_ignore_comments(std::ifstream& in, std::string& l){
+    char c = '#';
+    do{
+        std::getline(in, l);
+    } while(l[0] == c);  //loop until <line> is not a comment.
+}
 
 image readppm(std::string fname){
     std::ifstream infile;
@@ -127,44 +179,48 @@ image readppm(std::string fname){
         exit(1);
     }
     std::string line;
-    char c = '#';
-    do{
-        std::getline(infile, line);
-    } while(line[0] == c);  //loop until <line> is not a comment.
-    FORMAT = line;
-    do{
-        std::getline(infile, line);
-    } while(line[0] == c);
+    
+    //Get the magic number
+    getline_ignore_comments(infile, line);
+    std::string format = line;
+
+    //Get the width and height of the image
+    getline_ignore_comments(infile, line);
     std::stringstream linestream(line);
-    linestream >> WIDTH >> HEIGHT;
-    do{
-        std::getline(infile, line);
-    } while(line[0] == c);
+    int width, height;
+    linestream >> width >> height;
+
+    //get the max brightness value
+    getline_ignore_comments(infile, line);
     double max = std::stod(line);
-    image out; 
+    
+    std::vector<std::vector<pixel> > pixdata; 
     std::string lines = "";
+    
     while(std::getline(infile, line)){
-        if(line[0] != c) lines += line + " ";
+        if(line[0] != '#') lines += line + " ";
     }
+    
     linestream = std::stringstream(lines);
     std::vector<pixel> temp;
     double r, g, b, y;
+    
     //Grayscale image
-    if(FORMAT == "P2"){
-        while(linestream >> y && out.size() < HEIGHT){
+    if(format == "P2"){
+        while(linestream >> y && pixdata.size() < height){
             temp.push_back(pixel(y/max));
-            if(temp.size() == WIDTH){
-                out.push_back(temp);
+            if(temp.size() == width){
+                pixdata.push_back(temp);
                 temp.clear();
             }
         }
     }
     //Color Image
-    else if(FORMAT == "P3"){
-        while(linestream >> r >> g >> b && out.size() < HEIGHT){
+    else if(format == "P3"){
+        while(linestream >> r >> g >> b && pixdata.size() < height){
             temp.push_back(pixel(r/max, g/max, b/max));
-            if(temp.size() == WIDTH){
-                out.push_back(temp);
+            if(temp.size() == width){
+                pixdata.push_back(temp);
                 temp.clear();
             }
         }
@@ -174,24 +230,27 @@ image readppm(std::string fname){
         exit(2);
         infile.close();
     }
+
     infile.close();
-    return out;
+    image img(pixdata);
+    img.set_format(format);
+    return img;
 }
 
-void printppm(const image& in){
-    if(FORMAT == "P2"){
-        std::cout << "P2\n" << WIDTH << ' ' << HEIGHT << "\n255\n";
-        for(std::vector<pixel> i : in){
-            for(pixel pix : i){
+void printppm(const image& img){
+    if(img.get_format() == "P2"){
+        std::cout << "P2\n" << img.c() << ' ' << img.r() << "\n255\n";
+        for(int i = 0; i < img.r(); i++){
+            for(pixel pix : img[i]){
                 std::cout << int(pix.y * 255) << ' ';
             }
             std::cout << std::endl;
         }
     }
-    if(FORMAT == "P3"){
-        std::cout << "P3\n" << WIDTH << ' ' << HEIGHT << "\n255\n";
-        for(std::vector<pixel> i : in){
-            for(pixel pix : i){
+    if(img.get_format() == "P3"){
+        std::cout << "P3\n" << img.c() << ' ' << img.r() << "\n255\n";
+        for(int i = 0; i < img.r(); i++){
+            for(pixel pix : img[i]){
                 std::cout << int(pix.r * 255) << ' ' << int(pix.g * 255) << ' ' << int(pix.b * 255) << ' ';
             }
             std::cout << std::endl;
@@ -204,11 +263,11 @@ void to_ascii(const image& img){
     std::string pix = " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
     int colordepth = pix.length();
     int scale = 75;
-    int w = WIDTH/scale;
-    int h = HEIGHT/scale;
+    int w = img.c()/scale;
+    int h = img.r()/scale;
     int avg, count;
-    for(int i = 0; i < HEIGHT - (HEIGHT%scale); i += h){
-        for(int j = 0; j < WIDTH - (WIDTH%scale); j+= w){
+    for(int i = 0; i < img.r() - (img.r()%scale); i += h){
+        for(int j = 0; j < img.c() - (img.c()%scale); j+= w){
             avg = 0;
             count = 0;
             for(int y = i; y < i + h; y++){

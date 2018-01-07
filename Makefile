@@ -1,5 +1,5 @@
 CXX=g++
-CXXFLAGS=-c -g -std=c++14
+CXXFLAGS=-c -std=c++14 -O3
 LNFLAGS=
 
 EXEC = glitch

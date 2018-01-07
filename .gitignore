@@ -1,4 +1,5 @@
 originals/*
+outputs/*
 glitch
 *.ppm
 *.pgm

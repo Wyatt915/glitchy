@@ -9,11 +9,6 @@
 
 #define PI 3.14159265358
 
-//--------------------------------------------[Globals]---------------------------------------------
-
-extern int WIDTH, HEIGHT;
-extern std::string FORMAT;
-
 //--------------------------------------[Typedefs and Structs]--------------------------------------
 
 struct coord{
@@ -42,8 +37,25 @@ struct pixel{
     pixel():r(0), g(0), b(0), y(0), gray(true) {}
 };
 
+class image{
+    private:
+        std::vector<std::vector<pixel> > data;
+        int rows, cols;
+        std::string format;
+    public:
+        image();
+        image(int r, int c);
+        image(std::vector<std::vector<pixel> >);
+        image(const image&);
+        int c() const;
+        int r() const;
+        std::string get_format() const;
+        void set_format(std::string);
+        const std::vector<pixel>& operator[](size_t i) const;
+        std::vector<pixel>& operator[](size_t i);
+};
+
 typedef std::vector<std::vector<double> > matrix;
-typedef std::vector<std::vector<pixel> > image;
 
 //----------------------------------------------[I/O]-----------------------------------------------
 
