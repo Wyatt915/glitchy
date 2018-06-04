@@ -71,4 +71,6 @@ image newimage();
 matrix angle(const image& x, const image& y);
 void threshold(image&, double value);
 void clip(image&);
+void clamp(int&, int, int);
+void to_ascii(const image &);
 void remap(image&, double, double);

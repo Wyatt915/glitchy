@@ -265,7 +265,7 @@ void to_ascii(const image& img){
     int scale = 75;
     int w = img.c()/scale;
     int h = img.r()/scale;
-    int avg, count;
+    double avg, count;
     for(int i = 0; i < img.r() - (img.r()%scale); i += h){
         for(int j = 0; j < img.c() - (img.c()%scale); j+= w){
             avg = 0;
@@ -277,7 +277,7 @@ void to_ascii(const image& img){
                 }
             }
             avg /= count;
-            char c = pix[avg*colordepth/255];
+            char c = pix[avg*colordepth];
             std::cout << c << c;
         }
         std::cout << '\n';
