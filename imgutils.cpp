@@ -1,8 +1,10 @@
+#include "canny.hpp"
 #include "imgutils.hpp"
 #include "image.hpp"
 
+#include <algorithm>    //std::sort
 #include <iostream>
-#include <stdlib.h>
+#include <cstdlib>
 
 
 //--------------------------------------[Image manipulations]---------------------------------------
@@ -171,5 +173,47 @@ void to_ascii(const image& img){
             std::cout << c << c;
         }
         std::cout << '\n';
+    }
+}
+
+void pixelsort(image& img, const image& edge){
+    int offset = 0;
+    int count = 0;
+    int prevpx = 0; //Default to the previous pixel not being an edge
+    for(int i = 0; i < img.r(); i++){
+        for(int j = 0; j < img.c(); j++){
+            //if we change from black to white or vice versa
+            if(edge[i][j].y != prevpx || j == img.c() - 1){
+                count++;
+            //}
+            //if(count %2){
+                std::sort(begin(img[i]) + offset, begin(img[i]) + j,
+                    [](const pixel& a, const pixel& b){
+                        return a.y < b.y;
+                    }
+                );
+                offset = j;
+                prevpx = edge[i][j].y;
+            }
+        }
+        offset = 0;
+        prevpx = 0;
+    }
+}
+
+void jitter(image& img, int radius){
+    srand(time(NULL));
+    int xoff, yoff;
+    pixel temp;
+    for(int i = 0; i < img.r(); i++){
+        for(int j = 0; j < img.c(); j++){
+            xoff = rand() % radius - ceil(double(radius) / 2.0);
+            yoff = rand() % radius - ceil(double(radius) / 2.0);
+            clamp(xoff, 0, img.c());
+            clamp(yoff, 0, img.r());
+            temp = img[i][j];
+            img[i][j] = img[yoff][xoff];
+            img[yoff][xoff] = temp;
+        }
     }
 }

@@ -35,3 +35,5 @@ void clip(image&);
 void clamp(int&, int, int);
 void to_ascii(const image &);
 void remap(image&, double, double);
+void pixelsort(image&, const image&);
+void jitter(image&, int);
