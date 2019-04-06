@@ -7,6 +7,8 @@
 
 #include "imgutils.hpp"
 #include "canny.hpp"
+#include "image.hpp"
+#include "ppm.hpp"
 
 //-----------------------------------------[Pixel Sorting]------------------------------------------
 
@@ -73,9 +75,10 @@ int main(int argc, char* argv[]){
             case 'h':
                 std::cout << "Options:\n"
                           << "\t-a\tPrint an ASCII representation of the image.\n"
+                          << "\t-d\tPrint 1-bit dithered image to stdout\n"
                           << "\t-e\tEdge detection and print a PPM image to stdout.\n"
                           << "\t-h\tPrint this message.\n"
-                          << "\t-i file\tInput file (PPM)\n"
+                          << "\t-i file\tInput file (PPM format only). If this option is not specified, read from stdin.\n"
                           << "\t-s\tSort pixels and print a PPM image to stdout.\n\n"
                           << "Any PPM image can either be written to a file and viewed with most "
                           << "image software, or it can be piped directly into "
@@ -101,20 +104,21 @@ int main(int argc, char* argv[]){
         img = readppm(std::cin);
     }
 
+    // The reason that this is not just handled in the getopt block is so that we maintain the
+    // flexibility of reading an image from stdin, or specifying it with -i, and having the program
+    // automatically detect which option is taken.
+
     switch(flag) {
         case 'a':
             to_ascii(img);
             return 0;
         case 'e':
-            printppm(canny(img));
-            return 0;
+            return printppm(canny(img));
         case 'd':
             dither(img);
-            printppm(img);
-            return 0;
+            return printppm(img);
         case 's':
             pixelsort(img, canny(img));
-            printppm(img);
-            return 0;
+            return printppm(canny(img));
     }
 }

@@ -1,4 +1,4 @@
-#include "imgutils.hpp"
+#include "image.hpp"
 #include "canny.hpp"
 
 //Canny Edge Detector
@@ -117,7 +117,7 @@ image nmsuppression(const matrix& ang, const image& mag){
         }
     }
     return out;
-} 
+}
 
 //-------------------------------------------[Hysteresis]-------------------------------------------
 
@@ -145,7 +145,7 @@ void hysteresis(image& img, std::vector<coord> slist){
             visited[i][j] = false;
         }
     }
-    
+
     for(int i = 0; i < slist.size(); i++){
         //start a chain IFF the pixel is strong.
         if(img[slist[i].row][slist[i].col].y == 1.0) chain(img, slist[i].row, slist[i].col, visited);
