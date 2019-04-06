@@ -58,10 +58,13 @@ int main(int argc, char* argv[]){
     int c, flag;
     bool has_image = false;
     image img;
-    
-    while ((c = getopt(argc, argv, "aehi:s")) != -1) {
+    srand(time(NULL));
+    while ((c = getopt(argc, argv, "adehi:s")) != -1) {
         switch (c) {
             case 'a':
+                flag = c;
+                break;
+            case 'd':
                 flag = c;
                 break;
             case 'e':
@@ -80,7 +83,7 @@ int main(int argc, char* argv[]){
                 return 0;
             case 'i':
                 has_image = true;
-                img = readppm(std::string(optarg));
+                img = openppm(std::string(optarg));
                 break;
             case 's':
                 flag = c;
@@ -93,10 +96,9 @@ int main(int argc, char* argv[]){
                 return 2;
         }
     }
-    
+
     if(!has_image) {
-        std::cerr << "No imput specified.\n";
-        return 3;
+        img = readppm(std::cin);
     }
 
     switch(flag) {
@@ -105,6 +107,10 @@ int main(int argc, char* argv[]){
             return 0;
         case 'e':
             printppm(canny(img));
+            return 0;
+        case 'd':
+            dither(img);
+            printppm(img);
             return 0;
         case 's':
             pixelsort(img, canny(img));

@@ -2,6 +2,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <stdlib.h>
 
 //------------------------------------------[Image Class]-------------------------------------------
 
@@ -162,49 +163,91 @@ void threshold(image& img, double val){
     }
 }
 
+//stochastic dither
+image sdither(const image& img){
+    image out(img.r(), img.c());
+    for(int i = 0; i < img.r(); i++){
+        for(int j = 0; j < img.c(); j++){
+            out[i][j] = pixel(img[i][j].y * 1000 > rand() % 1000);
+            //out[i][j] = pixel(img[i][j].y);
+        }
+    }
+    out.set_format("P2");
+    return out;
+}
+
+//floyd-steinberg dither
+void dither(image& img){
+    pixel oldpixel;
+    pixel newpixel;
+    double q_error;
+    for(int i = 0; i < img.r(); i++){
+        for(int j = 0; j < img.c(); j++){
+            oldpixel = img[i][j];
+            newpixel = pixel(oldpixel.y > 0.5);
+            img[i][j] = newpixel;
+            q_error = oldpixel.y - newpixel.y;
+            if (j < img.c() - 1)            img[i  ][j+1].y += q_error * 7.0 / 16.0;
+            if (j > 0 && i < img.r() - 1)   img[i+1][j-1].y += q_error * 3.0 / 16.0;
+            if (i < img.r() - 1)            img[i+1][j  ].y += q_error * 5.0 / 16.0;
+            if (i<img.r()-1 && j<img.c()-1) img[i+1][j+1].y += q_error * 1.0 / 16.0;
+        }
+    }
+    img.set_format("P1");
+}
+
+
 //----------------------------------------------[I/O]-----------------------------------------------
 
-void getline_ignore_comments(std::ifstream& in, std::string& l){
+void getline_ignore_comments(std::istream& in, std::string& l){
     char c = '#';
     do{
         std::getline(in, l);
     } while(l[0] == c);  //loop until <line> is not a comment.
 }
 
-image readppm(std::string fname){
-    std::ifstream infile;
-    infile.open(fname);
-    if (!infile){
+image openppm(std::string fname){
+    std::filebuf infile;
+    image img;
+    if (infile.open(fname, std::ios::in)){
+        std::istream is(&infile);
+        img = readppm(is);
+        infile.close();
+    }
+    else {
         std::cerr << "Unable to open file.\n";
         exit(1);
     }
+    return img;
+}
+
+image readppm(std::istream& in){
     std::string line;
-    
     //Get the magic number
-    getline_ignore_comments(infile, line);
+    getline_ignore_comments(in, line);
     std::string format = line;
 
     //Get the width and height of the image
-    getline_ignore_comments(infile, line);
+    getline_ignore_comments(in, line);
     std::stringstream linestream(line);
     int width, height;
     linestream >> width >> height;
 
     //get the max brightness value
-    getline_ignore_comments(infile, line);
+    getline_ignore_comments(in, line);
     double max = std::stod(line);
-    
-    std::vector<std::vector<pixel> > pixdata; 
+
+    std::vector<std::vector<pixel> > pixdata;
     std::string lines = "";
-    
-    while(std::getline(infile, line)){
+
+    while(std::getline(in, line)){
         if(line[0] != '#') lines += line + " ";
     }
-    
+
     linestream = std::stringstream(lines);
     std::vector<pixel> temp;
     double r, g, b, y;
-    
+
     //Grayscale image
     if(format == "P2"){
         while(linestream >> y && pixdata.size() < height){
@@ -228,16 +271,23 @@ image readppm(std::string fname){
     else{
         std::cerr << "Unknown file type.\n";
         exit(2);
-        infile.close();
     }
 
-    infile.close();
     image img(pixdata);
     img.set_format(format);
     return img;
 }
 
 void printppm(const image& img){
+    if(img.get_format() == "P1"){
+        std::cout << "P1\n" << img.c() << ' ' << img.r() << "\n";
+        for(int i = 0; i < img.r(); i++){
+            for(pixel pix : img[i]){
+                std::cout << int(1-pix.y) << ' ';
+            }
+            std::cout << std::endl;
+        }
+    }
     if(img.get_format() == "P2"){
         std::cout << "P2\n" << img.c() << ' ' << img.r() << "\n255\n";
         for(int i = 0; i < img.r(); i++){

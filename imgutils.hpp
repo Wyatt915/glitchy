@@ -21,7 +21,7 @@ struct pixel{
     bool gray;
     double r, g, b;
     double y;
-    pixel(double red, double grn, double blu): 
+    pixel(double red, double grn, double blu):
         r(red), g(grn), b(blu)
         {
             gray = false;
@@ -59,7 +59,8 @@ typedef std::vector<std::vector<double> > matrix;
 
 //----------------------------------------------[I/O]-----------------------------------------------
 
-image readppm(std::string);
+image readppm(std::istream&);
+image openppm(std::string);
 void printppm(const image&);
 
 //-------------------------------------------[Functions]--------------------------------------------
@@ -68,6 +69,8 @@ image convolution(const image&, const matrix& kernel, double coef = 1.0);
 image gaussian(const image&);
 image magnitude(const image& x, const image& y);
 image newimage();
+void dither(image&);
+image sdither(const image&);
 matrix angle(const image& x, const image& y);
 void threshold(image&, double value);
 void clip(image&);
