@@ -17,9 +17,12 @@ int main(int argc, char* argv[]){
     bool has_image = false;
     image img;
     srand(time(NULL));
-    while ((c = getopt(argc, argv, "adehi:s")) != -1) {
+    while ((c = getopt(argc, argv, "abdehi:s")) != -1) {
         switch (c) {
             case 'a':
+                flag = c;
+                break;
+            case 'b':
                 flag = c;
                 break;
             case 'd':
@@ -67,6 +70,9 @@ int main(int argc, char* argv[]){
     switch(flag) {
         case 'a':
             to_ascii(img);
+            return 0;
+        case 'b':
+            to_braille(img);
             return 0;
         case 'e':
             return printppm(canny(img));
