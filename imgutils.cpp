@@ -149,6 +149,26 @@ void dither(image& img){
     img.set_format("P1");
 }
 
+void downscale(image& img){
+    image temp(img.r()/2, img.c()/2);
+    double r, g, b;
+    for(int row = 0; row + 2 <= img.r(); row += 2){
+        for(int col = 0; col + 2 <= img.c(); col += 2){
+            r = 0; g = 0; b = 0;
+            for(int i = 0; i < 2; i++){
+                for(int j = 0; j < 2; j++){
+                    r += img[row+i][col+j].r;
+                    g += img[row+i][col+j].g;
+                    b += img[row+i][col+j].b;
+                }
+            }
+            r /= 4; g /= 4; b /= 4;
+            temp[row/2][col/2] = pixel(r, g, b);
+        }
+    }
+    img = temp;
+}
+
 
 void to_ascii(const image& img){
     std::cout << '\n';
@@ -218,6 +238,9 @@ void to_braille(image img){
     // 1 4
     // 2 5
     // 6 7
+    while(img.c() > 200){
+        downscale(img);
+    }
     dither(img); //get the image to 1-bit b&w
     int codepoint = 0;
     for(int row = 0; row + 4 <= img.r(); row += 4){
@@ -231,7 +254,6 @@ void to_braille(image img){
             codepoint |= int(img[row+2][col+1].y) << 5;
             codepoint |= int(img[row+3][col+0].y) << 6;
             codepoint |= int(img[row+3][col+1].y) << 7;
-            //std::cout << codepoint << ' ';
             int_to_utf8(codepoint + 0x2800);
         }
         putchar('\n');
