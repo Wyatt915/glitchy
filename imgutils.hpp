@@ -6,6 +6,7 @@
 
 #define MAX(X,Y) ((X)>(Y)?(X):(Y))
 #define MIN(X,Y) ((X)<(Y)?(X):(Y))
+#define ABS(N)   ((N<0)?(-N):(N))
 
 #define PI 3.14159265358
 
@@ -28,11 +29,13 @@ image gaussian(const image&);
 image magnitude(const image& x, const image& y);
 image newimage();
 void dither(image&);
+void dither(image&, int);
 image sdither(const image&);
 matrix angle(const image& x, const image& y);
 void threshold(image&, double value);
 void clip(image&);
 void clamp(int&, int, int);
+int int_to_utf8(uint32_t);
 void to_ascii(const image &);
 void to_braille(image);
 void remap(image&, double, double);

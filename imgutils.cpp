@@ -2,9 +2,13 @@
 #include "imgutils.hpp"
 #include "image.hpp"
 
+#include <sys/ioctl.h> //ioctl() and TIOCGWINSZ
+#include <unistd.h> // for STDOUT_FILENO
+
 #include <algorithm>    //std::sort
 #include <iostream>
 #include <cstdlib>
+#include <math.h>
 
 
 //--------------------------------------[Image manipulations]---------------------------------------
@@ -149,6 +153,38 @@ void dither(image& img){
     img.set_format("P1");
 }
 
+double find_closest_palette_color(double color, int colordepth){
+    double step = 1.0 / double(colordepth - 1);
+    double palette_color = 0.0;
+    while(palette_color < color){
+        palette_color += step;
+    }
+    //if (ABS(color - palette_color) > ABS(color - (palette_color - step))){
+    //    palette_color -= step;
+    //}
+    return MIN(palette_color, 1.0f);
+}
+
+//floyd-steinberg dither
+void dither(image& img, int colordepth){
+    pixel oldpixel;
+    pixel newpixel;
+    double q_error;
+    for(int i = 0; i < img.r(); i++){
+        for(int j = 0; j < img.c(); j++){
+            oldpixel = img[i][j];
+            newpixel = pixel(find_closest_palette_color(oldpixel.y, colordepth));
+            img[i][j] = newpixel;
+            q_error = oldpixel.y - newpixel.y;
+            if (j < img.c() - 1)            img[i  ][j+1].y += q_error * 7.0 / 16.0;
+            if (j > 0 && i < img.r() - 1)   img[i+1][j-1].y += q_error * 3.0 / 16.0;
+            if (i < img.r() - 1)            img[i+1][j  ].y += q_error * 5.0 / 16.0;
+            if (i<img.r()-1 && j<img.c()-1) img[i+1][j+1].y += q_error * 1.0 / 16.0;
+        }
+    }
+    img.set_format("P2");
+}
+
 void downscale(image& img){
     image temp(img.r()/2, img.c()/2);
     double r, g, b;
@@ -170,26 +206,24 @@ void downscale(image& img){
 }
 
 
-void to_ascii(const image& img){
+void to_ascii(const image& original){
     std::cout << '\n';
-    std::string pix = " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
+    //std::string pix = " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
+    std::string pix = " .:-=+*#%@";
     int colordepth = pix.length();
-    int scale = 75;
-    int w = img.c()/scale;
-    int h = img.r()/scale;
+    image img = original;
+    // get terminal size
+    struct winsize size;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &size);
+    // each ASCII character is repeated twice
+    while(img.c() > size.ws_col / 2){
+        downscale(img);
+    }
+    dither(img, colordepth);
     double avg, count;
-    for(int i = 0; i < img.r() - (img.r()%scale); i += h){
-        for(int j = 0; j < img.c() - (img.c()%scale); j+= w){
-            avg = 0;
-            count = 0;
-            for(int y = i; y < i + h; y++){
-                for(int x = j; x < j + w; x++){
-                    avg += img[y][x].y;
-                    count++;
-                }
-            }
-            avg /= count;
-            char c = pix[avg*colordepth];
+    for(int i = 0; i < img.r(); i++){
+        for(int j = 0; j < img.c(); j++){
+            char c = pix[int(round(img[i][j].y*colordepth))];
             std::cout << c << c;
         }
         std::cout << '\n';
@@ -238,7 +272,12 @@ void to_braille(image img){
     // 1 4
     // 2 5
     // 6 7
-    while(img.c() > 200){
+
+    // get terminal size
+    struct winsize size;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &size);
+    // each braille character has a width of 2 pixels
+    while(img.c() > size.ws_col * 2){
         downscale(img);
     }
     dither(img); //get the image to 1-bit b&w

@@ -77,7 +77,7 @@ int main(int argc, char* argv[]){
         case 'e':
             return printppm(canny(img));
         case 'd':
-            dither(img);
+            dither(img, 4);
             return printppm(img);
         case 's':
             pixelsort(img, canny(img));
