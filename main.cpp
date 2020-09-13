@@ -8,6 +8,7 @@
 #include "canny.hpp"
 #include "image.hpp"
 #include "ppm.hpp"
+#include "effects.hpp"
 
 //-----------------------------------------[Pixel Sorting]------------------------------------------
 
